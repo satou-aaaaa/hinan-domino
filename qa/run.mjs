@@ -525,11 +525,13 @@ try {
     const before = await mem(q);
     await q.click("#go-r");
     check("復習の画面は「復習」と出る・同じ問題", (await q.textContent("header")).includes("復習") && await q.evaluate(() => __nm.cur().tag) === "p1two|dp1");
+    const rk0 = await q.evaluate(() => __nm.todayKey()); // 期限はアプリの日付で見る（QA の途中で JST 0時をまたいでも落ちない。2026-11-28 0時に main の QA が落ちた）
     await solve(q); await q.click("#next"); await q.waitForTimeout(150);
+    const rk1 = await q.evaluate(() => __nm.todayKey()), plus3 = (d) => new Date(Date.parse(d + "T00:00:00Z") + 3 * 864e5).toISOString().slice(0, 10);
     const after = await mem(q), dp2 = await q.evaluate(() => JSON.parse(localStorage.getItem("hnd-depth")));
     check("復習を終えると結果は「復習」・今日の記録は増えない・シェアは出ない", (await q.textContent("h1")).includes("復習") && JSON.stringify(after.days) === JSON.stringify(before.days) && await q.locator("#share").count() === 0);
-    { const r1 = dp2.rv && dp2.rv["p1two|dp1"], d3 = new Date(Date.parse(TODAY + "T00:00:00Z") + 3 * 864e5).toISOString().slice(0, 10);
-      check("復習で一度で正解すると、次は3日後へ進む（同じ問題が残り、段は1・期限はちょうど3日後。toukyu-yomi #1 の CodeRabbit）", !!r1 && r1.s === 1 && r1.due === d3, JSON.stringify(r1)); }
+    { const r1 = dp2.rv && dp2.rv["p1two|dp1"];
+      check("復習で一度で正解すると、次は3日後へ進む（同じ問題が残り、段は1・期限はちょうど3日後。toukyu-yomi #1 の CodeRabbit）", !!r1 && r1.s === 1 && (r1.due === plus3(rk0) || r1.due === plus3(rk1)), JSON.stringify(r1)); }
     await q.goto(url); await q.waitForTimeout(150);
     check("復習を終えたら、ホームの「復習」は消える", await q.locator("#go-r").count() === 0);
     await q.evaluate(() => { const d = JSON.parse(localStorage.getItem("hnd-depth")); d.rv["nai|1"] = { s: 0, due: "2026-01-01", t: 1 }; d.rv["constructor|x"] = { s: 0, due: "2026-01-01", t: 2 }; localStorage.setItem("hnd-depth", JSON.stringify(d)); });
