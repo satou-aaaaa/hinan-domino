@@ -86,7 +86,7 @@ const RANGE = { 0: [60, 150], 1: [8, 45], 2: [1, 6] }; // 全員に届く置き�
         if (P.grp) why.push("資料の問題に2段目がある");
       }
       if (!P.src.length || P.src.some((x) => !Array.isArray(x) || !SRCOK.test(x[1]))) why.push("出典が無い");
-      if (s < 20 && JSON.stringify(k.make(G.rng(G.seedOf(`${k.id}|qa${s}`)), k.lv)).length !== JSON.stringify(k.make(G.rng(G.seedOf(`${k.id}|qa${s}`)), k.lv)).length || (s < 20 && k.make(G.rng(G.seedOf(`${k.id}|qa${s}`)), k.lv).v !== P.v)) why.push("同じ種で同じ問題にならない"); // make は覚えておくので、作り方を直に2回呼んで比べる
+      if (s < 20) { const a = JSON.stringify(k.make(G.rng(G.seedOf(`${k.id}|qa${s}`)), k.lv)), b = JSON.stringify(k.make(G.rng(G.seedOf(`${k.id}|qa${s}`)), k.lv)); if (a !== b || JSON.parse(a).v !== P.v) why.push("同じ種で同じ問題にならない"); } // make は覚えておくので、作り方を直に2回呼んで中身を全部比べる（PR #1 の CodeRabbit）
       seen[k.id].add(G.keyOf(P));
       if (why.length && !bad[k.id]) bad[k.id] = why.join("・") + "：" + P.q + " " + P.opts.join(" / ");
     }
@@ -129,7 +129,7 @@ const html = readFileSync(path.join(root, "index.html"), "utf8"), gen = readFile
 const gameOwn = (t) => t.replace(/<!-- ([a-z0-9-]+):begin[\s\S]*?<!-- \1:end -->/g, "").split("${Core.KOFI}").join("https://ko-fi.com/satouaaaaa").replace(/Core\.kofi\(("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\)/g, (m, a, b) => "`<p class=\"note kofi\">" + JSON.parse(a) + "、<a href=\"https://ko-fi.com/satouaaaaa\" target=\"_blank\" rel=\"noopener\">Ko-fi でコーヒー1杯の応援</a>をもらえると、" + JSON.parse(b) + "の励みになります（任意・遊ぶのはずっと無料）。</p>`");
 const ext = [...html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]).filter((u) => !/^https:\/\/fonts\.googleapis\.com(\/|$)|^https:\/\/ko-fi\.com\/satouaaaaa$/.test(u));
 check("外から読むのは文字（Google Fonts）だけ。スクリプト・広告・解析を入れない（出典のリンクは押したときに開くだけ）", ext.length === 0 && ![...html.matchAll(/<script[^>]+src="([^"]+)"/g)].some((m) => /^https?:/.test(m[1])), ext.join(","));
-check("CSP で通信先を自分だけにしている", /connect-src 'self'/.test(html) && !/connect-src[^;"]*https/.test(html));
+{ const cs = (html.match(/connect-src ([^;"]*)/) || [])[1]; check("CSP で通信先を自分だけにしている（connect-src は 'self' だけ）", !!cs && cs.trim() === "'self'", cs); }
 check("Math.random は練習・とことんの種だけ（今日の5問・上級は日付の乱数。data.js には無い）", (html.match(/Math\.random/g) || []).length === 2 && !/Math\.random/.test(gen));
 check("乱数は sort の比較の中で引かない（ブラウザで引く回数が変わる）", !/\.sort\(\s*\([^)]*\)\s*=>[^\n;]*\b(R|rng|rand|Math\.random)\s*\(/.test(html + gen));
 { const inl = html.split("<script>").slice(1).map((x) => x.split("</" + "script>")[0]).join("\n"); // index.html の中の script も見る（nemuri-kotsu#1 で行の途中に // を入れて画面が動かなくなった）
@@ -156,7 +156,7 @@ check("好きなだけ遊べる：チケット・回数の上限・🔒で開く
 check("README の URL のすぐ後ろに全角の字を続けない（Link check が URL の一部と読む）", !/https?:\/\/[\x21-\x7e]*[^\x00-\x7f]/.test(readme.replace(/\]\(https?:\/\/[^)\s]+\)/g, "").replace(/<https?:\/\/[^>\s]+>/g, "")));
 { const sw = readFileSync(path.join(root, "sw.js"), "utf8"), mf = JSON.parse(readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
   const shell = JSON.parse(sw.match(/SHELL = (\[[^\]]+\])/)[1]);
-  check("PWA：sw.js は画面のファイルを全部保存し（引き継ぎの transfer.js・深さの depth.js も）、取り直して保存し、外へ何も送らない", ["./index.html", "./data.js", "./transfer.js", "./depth.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"].every((f) => shell.includes(f)) && /cache: "reload"/.test(sw) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
+  check("PWA：sw.js は画面のファイルを全部保存し（引き継ぎの transfer.js・深さの depth.js も）、取り直して保存し、外へ何も送らない", ["./index.html", "./data.js", "./transfer.js", "./transfer-qr.js", "./depth.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"].every((f) => shell.includes(f)) && /cache: "reload"/.test(sw) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
   { const st = await checkSwStall(sw); check("PWA：通信が止まっても4秒ほどで保存した画面に切り替わり、少しずつ届く受信は待ち、何も無ければ60秒で返す（shared-workflows template/qa/sw-check.mjs）", st.ok, JSON.stringify(st)); }
   check("PWA：manifest にアイコン2つと名前がある", mf.name === "100人の町ドミノ" && /率先避難者/.test(mf.description) && !/蔵|燃/.test(mf.description) && mf.icons.length >= 2 && mf.start_url === "./"); }
 
@@ -229,7 +229,8 @@ try {
   // 今日の5問：1問目はまちがえる、2問目はヒント2回、ほかはそのまま
   await p.click("#go-d");
   const tags = await p.evaluate(() => __nm.load().runs.d.list);
-  check("今日の5問は日付から決まる（data.js の dailyTags と同じ）", JSON.stringify(tags) === JSON.stringify(G.dailyTags(TODAY)));
+  const runDate = await p.evaluate(() => __nm.load().runs.d.date); // QA の途中で0時をまたいでも、アプリが回に残した日付で比べる（PR #1 の CodeRabbit）
+  check("今日の5問は日付から決まる（data.js の dailyTags と同じ）", JSON.stringify(tags) === JSON.stringify(G.dailyTags(runDate)));
   check("問題の画面：1問目は町の問題。100人のマス・役目のボタン2つ（高さ44px以上）・「たのむ」は人と役目を選ぶまで押せない", await p.locator("#card").count() === 1 && await p.locator("#board .cell").count() === 100 && await p.locator("#roles button").count() === 2 && (await p.$$eval("#roles button, #try", (b) => b.every((x) => Math.round(x.getBoundingClientRect().height) >= 44))) && await p.locator("#try:disabled").count() === 1 && (await p.textContent("#card .sit")).length > 5);
   check("町のマスには読み上げ用の名前（何行何列・何で逃げる人）があり、Tab で止まるのは1つだけ（矢印で動く）", (await p.$$eval("#board .cell", (t) => t.filter((x) => !/^\d+行\d+列 (見て|声で|2人で)逃げる人/.test(x.getAttribute("aria-label") || "")).length)) === 0 && (await p.$$eval("#board .cell", (t) => t.filter((x) => x.tabIndex === 0).length)) === 1);
   { const bk = await badKey(p), exp = evac(G.make(tags[0]).g, G.parseAt(bk).at, G.parseAt(bk).role).size; await placeAt(p, bk); await p.waitForTimeout(100);
@@ -252,7 +253,7 @@ try {
   for (let i = 2; i < 5; i++) { await solve(p); await p.click("#next"); }
   await p.waitForTimeout(150);
   const s1 = await mem(p);
-  check("5問で結果：今日の記録に1問ごとのまちがい（1・2・0・0・0）", JSON.stringify(s1.days[TODAY]?.m) === "[1,2,0,0,0]");
+  check("5問で結果：今日の記録に1問ごとのまちがい（1・2・0・0・0）", JSON.stringify(s1.days[runDate]?.m) === "[1,2,0,0,0]");
   const share = await p.textContent(".share");
   check("シェアの文に答え・問題を出さない（印だけ）", /第\d+回/.test(share) && /🟢/.test(share) && !G.KINDS.some((k) => share.includes(k.name)) && !/m\/s|km/.test(share), share);
   check("まちがいのある日は Ko-fi の一言を出さない", await p.locator(".kofi").count() === 0);
@@ -263,9 +264,10 @@ try {
   // 上級：ヒントなし・3問
   await p.click("#go-h");
   check("上級はヒントのボタンが無い・3問", await p.locator("#hint").count() === 0 && (await p.evaluate(() => __nm.load().runs.h.list.length)) === 3);
+  const hDate = await p.evaluate(() => __nm.load().runs.h.date);
   for (let i = 0; i < 3; i++) { await solve(p); await p.click("#next"); }
   await p.waitForTimeout(150);
-  check("上級の記録は hdays に入る", (await mem(p)).hdays[TODAY]?.m.length === 3);
+  check("上級の記録は hdays に入る", (await mem(p)).hdays[hDate]?.m.length === 3);
   // 練習：記録を増やさない
   await p.click("#back"); await p.click("#go-p"); await p.click('.lv button[data-t="2"]');
   const before = await mem(p);
@@ -346,7 +348,7 @@ try {
     await p.click("#step1"); await p.click("#step1"); await p.click("#step1"); // 1回目はたのんだ人だけ（0手目）
     const E0 = evac(G0, 25, "k"), T0 = Array.from({ length: 100 }, (_, i) => (E0.has(i) ? E0.get(i) : -1)); // 期待は別に書いた決まり evac から
     const sh = await p.evaluate(() => [...document.querySelectorAll("#labgrid .cell.gone")].map((b) => [+b.dataset.i, b.textContent]));
-    check("町をつくって試す：「1手すすめる」で、はじめの町（3行6列に声をかける人）の決まりどおり2手目まで広がり、どのマスも決まりどおりの手の数字", sh.length === T0.filter((x) => x >= 1 && x <= 2).length && sh.every(([i, t]) => +t === T0[i]) && (await p.textContent("#labv")).includes("2手目"), JSON.stringify(sh).slice(0, 200));
+    check("町をつくって試す：「1手すすめる」で、はじめの町（3行6列に声をかける人）の決まりどおり2手目まで広がり、どのマスも決まりどおりの手の数字", JSON.stringify(sh.map(([i, t]) => [i, +t]).sort((a, b) => a[0] - b[0])) === JSON.stringify(T0.map((t, i) => [i, t]).filter(([, t]) => t >= 1 && t <= 2)) && (await p.textContent("#labv")).includes("2手目"), JSON.stringify(sh).slice(0, 200));
     await p.evaluate(() => A11y.set("calm", true)); await p.click("#fire");
     check("町をつくって試す：はじめの町では、2の並びの外からだと60人が残る（別に書いた決まりと同じ）", E0.size === 40 && (await p.textContent("#labv")).includes(`逃げた人：${E0.size}人`) && (await p.textContent("#labv")).includes("60人が残った"), await p.textContent("#labv"));
     await p.click('#tools button[data-tool="k"]'); await p.click('#labgrid .cell[data-i="45"]');
@@ -355,6 +357,8 @@ try {
     check("町をつくって試す：2の並びの上の声をかける人なら、決まりどおり100人全員に届く（動きを減らすなら、すぐ最後まで）", evac(G0, 45, "k").size === 100 && (await p.textContent("#labv")).includes("逃げた人：100人") && (await p.textContent("#labv")).includes("全員に届いた"), await p.textContent("#labv"));
     await p.click('#tools button[data-tool="w"]'); await p.click('#labgrid .cell[data-i="0"]');
     check("町をつくって試す：マスを押すと選んだ人（2人で逃げる人）に変わる", (await p.getAttribute('#labgrid .cell[data-i="0"]', "aria-label")).includes("2人で逃げる人"));
+    await p.keyboard.press("ArrowRight"); await p.keyboard.press("ArrowDown");
+    check("町をつくって試す：Tab で止まるマスは1つだけで、矢印キーでとなりのマスへ動ける（問題の盤と同じ）", (await p.$$eval("#labgrid .cell", (t) => t.filter((x) => x.tabIndex === 0).length)) === 1 && await p.evaluate(() => document.activeElement && document.activeElement.dataset.i) === "11");
     await p.evaluate(() => A11y.set("calm", false));
     check("町をつくって試す：記録を増やさない", JSON.stringify(await mem(p)) === before);
     await p.click("#back"); }
@@ -566,7 +570,7 @@ try {
         const ov = await q.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         if (ov > 0) bad.push(`${w}px 文字${fs} ${go || "ホーム"} ${ov}px`);
         // 町の盤（10×10）のマスは、幅320pxでは44pxにできない。WCAG 2.5.8 の24px以上を別に見る（矢印キーでも動ける）
-        small.push(...(await q.$$eval(".board .cell", (bs) => bs.filter((b) => b.checkVisibility() && Math.round(b.getBoundingClientRect().height) < 24).map((b) => "盤のマス" + b.dataset.i))).map((x) => `${w}/${fs}/${go}:${x}`));
+        small.push(...(await q.$$eval(".board .cell", (bs) => bs.filter((b) => { if (!b.checkVisibility()) return false; const r = b.getBoundingClientRect(); return r.width < 24 || r.height < 24; }).map((b) => "盤のマス" + b.dataset.i))).map((x) => `${w}/${fs}/${go}:${x}`));
         small.push(...(await q.$$eval("button:not([disabled]), a[href]", (bs) => bs.filter((b) => b.checkVisibility() && !b.closest(".cal") && !b.closest(".board")).filter((b) => Math.round(b.getBoundingClientRect().height) < 44).map((b) => (b.id || b.className || b.textContent).slice(0, 20)))).map((x) => `${w}/${fs}/${go}:${x}`));
       }
       await q.context().close();

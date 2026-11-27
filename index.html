@@ -1367,7 +1367,7 @@ footer [data-kiroku-open]{min-height:44px;min-width:44px;display:inline-flex;ali
   <ol>
     <li>10×10のマス目の町に100人が住んでいます。見＝見て逃げる人、声＝声で逃げる人、2＝2人に声をかけられたら逃げる人。</li>
     <li>町の1人を選び、「🏃率先避難者」（まっ先に逃げて姿を見せる）か「📣声をかける人」（となりに声をかける）をたのみます。</li>
-    <li>避難はドミノのように、1手ごとにとなり（上下左右）へ伝わります。逃げた人は、姿も見え、声もかけます。</li>
+    <li>避難はドミノのように、1手ごとにとなり（上下左右）へ伝わります。逃げた町の人は、姿も見え、声もかけます（率先避難者は姿だけ、声をかける人は声だけ）。</li>
     <li>100人全員に届けば正解。正解したら、ア〜エのどの人にたのむと全員に届くかも選びます。</li>
   </ol>
   <p>残った人（赤い点線）がいたら、その人が何で動く人かを見て、置き方を変えます。「町をつくって試す」でも試せます。</p>
@@ -1869,7 +1869,7 @@ function boardKey(e) {
   const to = { ArrowLeft: x > 0 ? i - 1 : i, ArrowRight: x < n - 1 ? i + 1 : i, ArrowUp: y > 0 ? i - n : i, ArrowDown: y < n - 1 ? i + n : i, Home: y * n, End: y * n + n - 1 }[e.key];
   if (to == null) return;
   e.preventDefault();
-  const b = $("board"); b.querySelectorAll(".cell").forEach((c) => (c.tabIndex = -1));
+  const b = e.currentTarget.parentElement; b.querySelectorAll(".cell").forEach((c) => (c.tabIndex = -1)); // 問題の盤も「町をつくって試す」の盤も同じ動き
   const f = b.querySelector(`.cell[data-i="${to}"]`); f.tabIndex = 0; f.focus();
 }
 function pickCell(i) {
@@ -2160,7 +2160,7 @@ function bindMaps(P, key) {
 // はじめの町：まん中の行が「2」の並び。並びの上の人に声をかける人をたのむと全員に届き、並びの外（3行6列）からだと60人が残る
 const LAB_G0 = "mmmmmvvvvv" + "mmmmmvvvvv" + "mmmmmvvvvv" + "mmmmmvvvvv" + "wwwwwwwwww" + "vvvvvmmmmm" + "vvvvvmmmmm" + "vvvvvmmmmm" + "vvvvvmmmmm" + "vvvvvmmmmm", LAB_AT0 = 25, LAB_R0 = "k";
 const TOOLS = [["m", "見 見て逃げる人"], ["v", "声 声で逃げる人"], ["w", "2 2人で逃げる人"], ["r", "🏃 率先避難者"], ["k", "📣 声をかける人"]];
-let labS = null, labTimer = 0, labFocus = -1;
+let labS = null, labTimer = 0, labFocus = -1, labTab = 0;
 document.addEventListener("core:screen", (e) => { if (labTimer && !(e.detail && e.detail.id === "lab")) { clearInterval(labTimer); labTimer = 0; } }); // ブラウザの「戻る」で画面を出たら止める
 function lab() {
   Core.screens.mark("lab"); // 「戻る」でホームへ
@@ -2174,15 +2174,15 @@ function lab() {
       <div class="row" style="padding:0 .7rem .8rem"><button class="main" id="fire">はじめる</button><button class="sub" id="step1">1手すすめる</button></div>
       <div class="row" style="padding:0 .7rem .8rem"><button class="sub" id="reset">はじめにもどす</button><button class="sub" id="town0">はじめの町</button></div>
     </div>
-    <p class="note" style="text-align:left">率先避難者は姿で、声をかける人は声で、となり（上下左右）に知らせます。逃げた人は、そのあと姿も見え、声もかけます。遊びのための単純な決まりで、人の行動を測ったものではありません。</p>
+    <p class="note" style="text-align:left">率先避難者は姿で、声をかける人は声で、となり（上下左右）に知らせます。逃げた町の人は、そのあと姿も見え、声もかけます（率先避難者は姿だけ、声をかける人は声だけ）。遊びのための単純な決まりで、人の行動を測ったものではありません。</p>
     ${footer()}`;
   const ran = () => G.spread(labS.g.join(""), labS.at, labS.role);
   const stop = () => { if (labTimer) { clearInterval(labTimer); labTimer = 0; } };
   const draw = () => {
     const T = ran(), all = G.stepsOf(T), k = labS.k;
     $("labgrid").innerHTML = labS.g.map((c, i) => { const at = i === labS.at, on = k >= 0 && T[i] >= 0 && T[i] <= k, left = k >= all && T[i] < 0;
-      return `<button class="cell p-${c}${at ? " at" : on ? " gone" : left ? " left" : ""}" data-i="${i}" aria-label="${G.posStr(i)} ${at ? roleName(labS.role) : G.PEOPLE[c].name}${on && !at ? `・${T[i]}手目に逃げた` : left ? "・残った" : ""}">${at ? G.ROLES[labS.role].ch : on ? T[i] : G.PEOPLE[c].ch}</button>`; }).join("");
-    document.querySelectorAll("#labgrid .cell").forEach((b) => (b.onclick = () => put(+b.dataset.i)));
+      return `<button class="cell p-${c}${at ? " at" : on ? " gone" : left ? " left" : ""}" data-i="${i}" tabindex="${i === labTab ? 0 : -1}" aria-label="${G.posStr(i)} ${at ? roleName(labS.role) : G.PEOPLE[c].name}${on && !at ? `・${T[i]}手目に逃げた` : left ? "・残った" : ""}">${at ? G.ROLES[labS.role].ch : on ? T[i] : G.PEOPLE[c].ch}</button>`; }).join("");
+    document.querySelectorAll("#labgrid .cell").forEach((b) => { b.onclick = () => put(+b.dataset.i); b.onkeydown = boardKey; b.onfocus = () => (labTab = +b.dataset.i); }); // Tab で止まるのは1マスだけ。矢印で動く（PR #1 の CodeRabbit）
     if (labFocus >= 0) { const f = document.querySelector(`#labgrid .cell[data-i="${labFocus}"]`); labFocus = -1; if (f) f.focus(); } // 押したマスにフォーカスをもどす（キーボードで続けて置ける）
     const shown = k < 0 ? 0 : T.filter((x) => x >= 0 && x <= k).length;
     $("labv").innerHTML = k < 0 ? `逃げる人：？<br><small>「はじめる」でドミノを見る</small>` : `逃げた人：${shown}人／100人<br><small>${Math.min(k, all)}手目${k >= all ? (G.countOf(T) === 100 ? "（全員に届いた）" : `（${100 - G.countOf(T)}人が残った）`) : ""}</small>`;
@@ -2191,7 +2191,7 @@ function lab() {
     $("step1").disabled = k >= all;
   };
   const put = (i) => {
-    stop(); labS.k = -1; labFocus = i;
+    stop(); labS.k = -1; labFocus = i; labTab = i;
     if (labS.tool === "r" || labS.tool === "k") { labS.at = i; labS.role = labS.tool; } else if (i === labS.at) { toast("役目の人は、別のマスに役目を置くと動かせます"); return draw(); } else labS.g[i] = labS.tool;
     draw();
   };
