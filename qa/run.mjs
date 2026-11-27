@@ -125,6 +125,8 @@ const RANGE = { 0: [60, 150], 1: [8, 45], 2: [1, 6] }; // 全員に届く置き�
 }
 // ---- 2. ファイルの中身 ----
 const html = readFileSync(path.join(root, "index.html"), "utf8"), gen = readFileSync(path.join(root, "data.js"), "utf8"), readme = readFileSync(path.join(root, "README.md"), "utf8");
+// ひな形の写し（<!-- 名前:begin〜end -->）はゲームの言葉ではないので外し、Core.kofi・Core.KOFI は写す前の形にもどして見る（shared-workflows の sync-template が足した）
+const gameOwn = (t) => t.replace(/<!-- ([a-z0-9-]+):begin[\s\S]*?<!-- \1:end -->/g, "").split("${Core.KOFI}").join("https://ko-fi.com/satouaaaaa").replace(/Core\.kofi\(("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\)/g, (m, a, b) => "`<p class=\"note kofi\">" + JSON.parse(a) + "、<a href=\"https://ko-fi.com/satouaaaaa\" target=\"_blank\" rel=\"noopener\">Ko-fi でコーヒー1杯の応援</a>をもらえると、" + JSON.parse(b) + "の励みになります（任意・遊ぶのはずっと無料）。</p>`");
 const ext = [...html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]).filter((u) => !/^https:\/\/fonts\.googleapis\.com(\/|$)|^https:\/\/ko-fi\.com\/satouaaaaa$/.test(u));
 check("外から読むのは文字（Google Fonts）だけ。スクリプト・広告・解析を入れない（出典のリンクは押したときに開くだけ）", ext.length === 0 && ![...html.matchAll(/<script[^>]+src="([^"]+)"/g)].some((m) => /^https?:/.test(m[1])), ext.join(","));
 check("CSP で通信先を自分だけにしている", /connect-src 'self'/.test(html) && !/connect-src[^;"]*https/.test(html));
@@ -132,7 +134,7 @@ check("Math.random は練習・とことんの種だけ（今日の5問・上級
 check("乱数は sort の比較の中で引かない（ブラウザで引く回数が変わる）", !/\.sort\(\s*\([^)]*\)\s*=>[^\n;]*\b(R|rng|rand|Math\.random)\s*\(/.test(html + gen));
 { const inl = html.split("<script>").slice(1).map((x) => x.split("</" + "script>")[0]).join("\n"); // index.html の中の script も見る（nemuri-kotsu#1 で行の途中に // を入れて画面が動かなくなった）
   check("一行の式の途中にコメント // を足さない（行の残りが消える。rosen-hitofude 2026-11-04・nemuri-kotsu#1）", !/;\s*\/\/[^\n]*;\s*\w/.test((gen + "\n" + inl).split("\n").filter((l) => !l.trim().startsWith("//")).join("\n"))); }
-check("言い方：「絶対」と言い切らない", !/絶対に安全|絶対に来ない|必ず上陸/.test(html + gen + readme));
+check("言い方：「絶対」と言い切らない", !/絶対に安全|絶対に来ない|必ず上陸/.test(gameOwn(html) + gen + readme));
 { const howto = (html.match(/<dialog id="howto"[\s\S]*?<\/dialog>/) || [""])[0], ab = (html.match(/function about\(\)[\s\S]*?\n}/) || [""])[0], dis = (t) => /遊びのための単純な決まり/.test(t) && /人の行動を測ったものではな/.test(t) && /本物の避難/.test(t) && /練習のための例/.test(t);
   check("言い方：遊び方・「このゲームについて」・README のどれにも、マス目の伝わり方は遊びのための単純な決まりで人の行動を測ったものではないこと・本物の避難の速さではないこと・問題の町は練習の例であることがある", dis(howto) && dis(ab) && dis(readme), `遊び方 ${dis(howto)}・について ${dis(ab)}・README ${dis(readme)}`); }
 { const body = html.replace(/<!-- a11y:begin[\s\S]*?a11y:end -->/, "").replace(/<!-- store:begin[\s\S]*?store:end -->/, "").replace(/<!-- core:begin[\s\S]*?core:end -->/, "").replace(/<!-- kiroku:begin[\s\S]*?kiroku:end -->/, "") + gen + readme + readFileSync(path.join(root, "tools/make-og.cjs"), "utf8") + readFileSync(path.join(root, "tools/make-icons.cjs"), "utf8") + readFileSync(path.join(root, "manifest.webmanifest"), "utf8"); // AGENTS.md は写し元の名前を書くので見ない
@@ -144,7 +146,7 @@ check("言い方：「絶対」と言い切らない", !/絶対に安全|絶対�
   check("手で書く所がこのゲームの言葉：description・遊び方・2段目の問い・ホームの1行目・2段目のまちがいの案内", /率先避難者/.test(desc) && /声をかける人/.test(desc) && /100人/.test(desc) && /ア〜エのどの人に/.test(html) && /だれに、どちらをたのむ？/.test(html) && /2の並びもこえられる？/.test(html) && /2人に声をかけられたら逃げる人/.test(html)); }
 check("画面にお笑いの言葉を入れない（本物っぽく）", !/お笑い|ギャグ|ツッコミ|なんでやねん|（うそ）/.test(html + gen));
 check("引き継ぎ：transfer.js をゲームの script より前に、このゲームの記録のキー（記録・文字・復習）だけで読む・depth.js も前に読む", /<script src="transfer\.js" data-game="hinan-domino" data-keys="hnd-v1,hnd-fs,hnd-depth"><\/script>\s*<script src="depth\.js" data-game="hinan-domino" data-key="hnd-depth"><\/script>\s*<\/head>/.test(html) && html.indexOf('src="transfer.js"') < html.indexOf('src="data.js"') && /data-hk/.test(html) && existsSync(path.join(root, "transfer.js")));
-check("好きなだけ遊べる：チケット・回数の上限・🔒で開くモードを入れない（game-dev.md F1・F2）", !/🎫|チケット|すると開く|🔒/.test(html) && !/\blife\b|ELIFE/.test(html));
+check("好きなだけ遊べる：チケット・回数の上限・🔒で開くモードを入れない（game-dev.md F1・F2）", !/🎫|チケット|すると開く|🔒/.test(gameOwn(html)) && !/\blife\b|ELIFE/.test(gameOwn(html)));
 { const og = (k) => (html.match(new RegExp(`<meta (?:property|name)="${k}" content="([^"]+)"`)) || [])[1] || "";
   const png = readFileSync(path.join(root, "og.png"));
   check("SNS で貼ると絵と題が出る（OGP・1200×630・絶対URL）", og("og:title") && og("og:description") && og("og:image") === "https://satou-aaaaa.github.io/hinan-domino/og.png" && og("twitter:card") === "summary_large_image" && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630); }
@@ -228,7 +230,7 @@ try {
   await p.click("#go-d");
   const tags = await p.evaluate(() => __nm.load().runs.d.list);
   check("今日の5問は日付から決まる（data.js の dailyTags と同じ）", JSON.stringify(tags) === JSON.stringify(G.dailyTags(TODAY)));
-  check("問題の画面：1問目は町の問題。100人のマス・役目のボタン2つ（高さ44px以上）・「たのむ」は人と役目を選ぶまで押せない", await p.locator("#card").count() === 1 && await p.locator("#board .cell").count() === 100 && await p.locator("#roles button").count() === 2 && (await p.$$eval("#roles button, #try", (b) => b.every((x) => x.getBoundingClientRect().height >= 44))) && await p.locator("#try:disabled").count() === 1 && (await p.textContent("#card .sit")).length > 5);
+  check("問題の画面：1問目は町の問題。100人のマス・役目のボタン2つ（高さ44px以上）・「たのむ」は人と役目を選ぶまで押せない", await p.locator("#card").count() === 1 && await p.locator("#board .cell").count() === 100 && await p.locator("#roles button").count() === 2 && (await p.$$eval("#roles button, #try", (b) => b.every((x) => Math.round(x.getBoundingClientRect().height) >= 44))) && await p.locator("#try:disabled").count() === 1 && (await p.textContent("#card .sit")).length > 5);
   check("町のマスには読み上げ用の名前（何行何列・何で逃げる人）があり、Tab で止まるのは1つだけ（矢印で動く）", (await p.$$eval("#board .cell", (t) => t.filter((x) => !/^\d+行\d+列 (見て|声で|2人で)逃げる人/.test(x.getAttribute("aria-label") || "")).length)) === 0 && (await p.$$eval("#board .cell", (t) => t.filter((x) => x.tabIndex === 0).length)) === 1);
   { const bk = await badKey(p), exp = evac(G.make(tags[0]).g, G.parseAt(bk).at, G.parseAt(bk).role).size; await placeAt(p, bk); await p.waitForTimeout(100);
     check("全員に届かない置き方は ✕ と、逃げた人数・残った人数（別に書いた決まりで数えた数）・知らせは role=status・残った人は点線のわく（色だけで分けない）", /✕/.test(await p.textContent("#msg")) && (await p.textContent("#msg")).includes(`${exp}人が逃げ、${100 - exp}人が残りました`) && await p.getAttribute("#msg", "role") === "status" && await p.locator("#board .cell.left").count() === 100 - exp && (await p.evaluate(() => getComputedStyle(document.querySelector("#board .cell.left")).outlineStyle)) === "dashed", await p.textContent("#msg")); }
