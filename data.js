@@ -139,7 +139,7 @@
       const hs = S.sols[ri(R, 0, S.sols.length - 1)]; // ヒントで教える置き方
       const gwhy = `${CL[c.best]}（${posStr(good)}）に${ROLES[c.role].name}なら、${stepsOf(tg)}手で100人全員に届きます。ほかの3人では、逃げない人が残ります。`;
       const why = `この町で全員に届く置き方は、200通りのうち${S.sols.length}通り。逃げるきっかけは人によってちがいます。${S.g.includes("w") ? "2人で逃げる人は、声が2人分そろうまで動きません。" : ""}`;
-      return { type: "place", media: MEDIA.town, q: PLACE_Q[si](), opts: [], ans: "", g: S.g, n: N, sols: S.sols, hint: hs, cands: c.cs, crole: c.role, grp: GK[c.best], gwhy, why, v: `${si}:${S.g}:${c.role}${c.cs.join(".")}` };
+      return { type: "place", media: MEDIA.town, q: PLACE_Q[si](), opts: [], ans: null, g: S.g, n: N, sols: S.sols, hint: hs, cands: c.cs, crole: c.role, grp: GK[c.best], gwhy, why, v: `${si}:${S.g}:${c.role}${c.cs.join(".")}` };
     };
   }
   const P_ = (id, lv, town, lo, hi, name, look, key) => ({ id, lv, ans: "", col: "town", name, look, key, why: "", src: ["kohou", "guide"], make: placeMake(TOWN[town], lo, hi), n: N, grid: 1 });
